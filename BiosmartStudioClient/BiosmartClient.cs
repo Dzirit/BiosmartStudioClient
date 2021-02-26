@@ -34,37 +34,28 @@ namespace BiosmarStudioClient
 
         public void SendRequest(string message)
         {
-            // Translate the passed message into ASCII and store it as a Byte array.
-            Byte[] data = System.Text.Encoding.ASCII.GetBytes(message);
-            // Get a client stream for reading and writing.
-            // Stream stream = client.GetStream();
+            byte[] data = Encoding.UTF8.GetBytes(message);
             stream = client.GetStream();
-            // Send the message to the connected TcpServer.
             stream.Write(data, 0, data.Length);
             Console.WriteLine("Sent:\n {0}", message);
             Debug.WriteLine("Sent:\n {0}", message);
-            // Receive the TcpServer.response.
-
         }
+
         public void ReadAnswer()
         {
-            // Buffer to store the response bytes.
-            var data = new Byte[1024 * 1024];
-            // String to store the response ASCII representation.
-            string responseData = String.Empty;
-            // Read the first batch of the TcpServer response bytes.
+            var data = new byte[1024 * 1024];
+            string responseData = string.Empty;
             var bytes = stream.Read(data, 0, data.Length);
-            responseData = System.Text.Encoding.UTF8.GetString(data, 0, bytes);
-
+            responseData = Encoding.UTF8.GetString(data, 0, bytes);
             Console.WriteLine("Received:\n {0}", responseData);
             Debug.WriteLine("Received:\n {0}", responseData);
         }
+
         private byte[] ConvertXmlToByteArray(XElement xml, Encoding encoding)
         {
             using (MemoryStream stream = new MemoryStream())
             {
                 XmlWriterSettings settings = new XmlWriterSettings();
-                // Add formatting and other writer options here if desired
                 settings.Encoding = encoding;
                 settings.Indent = false;
                 //settings.OmitXmlDeclaration = true; // No prolog
@@ -76,6 +67,7 @@ namespace BiosmarStudioClient
                 return stream.ToArray();
             }
         }
+
         public string RequestEmployees()
         {
             XElement krecept = new XElement("KRECEPT", new XElement("REQUEST", new XAttribute("type", 5), new XElement("RECORD", new XAttribute("operation", 0))));
@@ -83,6 +75,7 @@ namespace BiosmarStudioClient
             var str = Encoding.UTF8.GetString(arr);
             return str;
         }
+
         public string RequestStartEventMonitoring(string controllerId)
         {
             XElement krecept =
@@ -93,6 +86,7 @@ namespace BiosmarStudioClient
             var str = Encoding.UTF8.GetString(arr);
             return str;
         }
+
         public string RequestStopEventMonitoring(string controllerId)
         {
             XElement krecept =
@@ -103,6 +97,7 @@ namespace BiosmarStudioClient
             var str = Encoding.UTF8.GetString(arr);
             return str;
         }
+
         public string RequestControllers()
         {
             XElement krecept =
@@ -112,6 +107,7 @@ namespace BiosmarStudioClient
             var str = Encoding.UTF8.GetString(arr);
             return str;
         }
+
         public string RequestMonitoringEvents()
         {
             XElement krecept =
@@ -122,6 +118,7 @@ namespace BiosmarStudioClient
             var str = Encoding.UTF8.GetString(arr);
             return str;
         }
+
         public string RequestEmployeesCards()
         {
             XElement krecept = new XElement("KRECEPT", new XElement("REQUEST", new XAttribute("type", 9), new XElement("RECORD", new XAttribute("operation", 0))));
@@ -129,6 +126,7 @@ namespace BiosmarStudioClient
             var str = Encoding.UTF8.GetString(arr);
             return str;
         }
+
         public string RequestAddEmployeeCard()
         {
             XElement krecept = new XElement("KRECEPT", new XElement("REQUEST", new XAttribute("type", 9), new XElement("RECORD", new XAttribute("operation", 1), new XAttribute("ca_ow_id", "bs67200118"), new XAttribute("ca_value", "1167200117"))));
@@ -162,6 +160,7 @@ namespace BiosmarStudioClient
             var str = System.Text.Encoding.UTF8.GetString(arr);
             return str;
         }
+
         public void CloseConnection()
         {
             stream?.Close();
