@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
+using System.Reflection.Metadata;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
@@ -15,12 +16,16 @@ namespace BiosmarStudioClient
 {
     class BiosmartClient
     {
-        TcpClient client;
-        NetworkStream stream;
+        private TcpClient client;
+        private NetworkStream stream;
+        private string server;
+        private int port;
         public BiosmartClient(string server, int port)
         {
             try
             {
+                this.server = server;
+                this.port = port;
                 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
                 var enc1251 = Encoding.GetEncoding(1251);
                 Console.InputEncoding = enc1251;
@@ -38,11 +43,11 @@ namespace BiosmarStudioClient
 
         public void SendRequest(string message)
         {
+            client = new TcpClient(server, port);
             byte[] data = Encoding.UTF8.GetBytes(message);
             stream = client.GetStream();
             stream.Write(data, 0, data.Length);
             Console.WriteLine("Sent:\n {0}", message);
-            Debug.WriteLine("Sent:\n {0}", message);
         }
 
         public string ReadAnswer()
@@ -53,7 +58,7 @@ namespace BiosmarStudioClient
             var dataWithoutNull = NullRemover(data);//it solve problem with xml parsing
             responseData = Encoding.UTF8.GetString(dataWithoutNull, 0, dataWithoutNull.Length);
             Console.WriteLine("Received:\n {0}", responseData);
-            Debug.WriteLine("Received:\n {0}", responseData);
+            CloseConnection();
             return responseData;
         }
         private byte[] NullRemover(byte[] dataStream)
