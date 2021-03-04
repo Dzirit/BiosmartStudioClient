@@ -2,10 +2,14 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
+using System.Xml.Schema;
+using System.Xml.XPath;
+using BiosmartStudioClient;
 
 namespace BiosmarStudioClient
 {
@@ -24,11 +28,11 @@ namespace BiosmarStudioClient
             }
             catch (ArgumentNullException e)
             {
-                Console.WriteLine("ArgumentNullException: {0}", e);
+                Console.WriteLine($"ArgumentNullException: {e}");
             }
             catch (SocketException e)
             {
-                Console.WriteLine("SocketException: {0}", e);
+                Console.WriteLine($"SocketException: {e}");
             }
         }
 
@@ -41,14 +45,66 @@ namespace BiosmarStudioClient
             Debug.WriteLine("Sent:\n {0}", message);
         }
 
-        public void ReadAnswer()
+        public string ReadAnswer()
         {
             var data = new byte[1024 * 1024];
             string responseData = string.Empty;
-            var bytes = stream.Read(data, 0, data.Length);
-            responseData = Encoding.UTF8.GetString(data, 0, bytes);
+            stream.Read(data, 0, data.Length);
+            var dataWithoutNull = NullRemover(data);//it solve problem with xml parsing
+            responseData = Encoding.UTF8.GetString(dataWithoutNull, 0, dataWithoutNull.Length);
             Console.WriteLine("Received:\n {0}", responseData);
             Debug.WriteLine("Received:\n {0}", responseData);
+            return responseData;
+        }
+        private byte[] NullRemover(byte[] dataStream)
+        {
+            int i;
+            byte[] temp = new byte[dataStream.Length];
+            for (i = 0; i < dataStream.Length - 1; i++)
+            {
+                if (dataStream[i] == 0x00) break;
+                temp[i] = dataStream[i];
+            }
+            byte[] NullLessDataStream = new byte[i];
+            for (i = 0; i < NullLessDataStream.Length; i++)
+            {
+                NullLessDataStream[i] = temp[i];
+            }
+            return NullLessDataStream;
+        }
+        public List<string> ParseOrganizations(string answer)
+        {
+            List<string> orgs = new List<string>();
+            var xml = XDocument.Parse(answer);
+            var xRoot = xml.Root;
+            var xAnswer = xRoot.Element("answer");
+            if (xAnswer.Attribute("type").Value == "6")
+            {
+                foreach (var rec in xAnswer.Descendants("RECORD"))
+                    orgs.Add(rec.Attribute("id").Value);
+            }
+            else
+            {
+                Console.WriteLine("Ответ на другую команду!");
+            }
+            return orgs;
+        }
+        public string ParseUserId(string answer)
+        {
+            string userId="";
+            var xml = XDocument.Parse(answer);
+            var xRoot = xml.Root;
+            var xAnswer = xRoot.Element("answer");
+            if (xAnswer.Attribute("type").Value == "5")
+            {
+                foreach (var rec in xAnswer.Descendants("RECORD"))
+                    userId=rec.Attribute("id").Value;
+            }
+            else
+            {
+                Console.WriteLine("Ответ на другую команду!");
+            }
+            return userId;
         }
 
         private byte[] ConvertXmlToByteArray(XElement xml, Encoding encoding)
@@ -67,10 +123,38 @@ namespace BiosmarStudioClient
                 return stream.ToArray();
             }
         }
-
+        public string RequestAddTemplates(List<PalmTemplate> palmTemplates)
+        {
+            XElement krecept =
+                new XElement("KRECEPT",
+                new XElement("REQUEST",
+                    new XAttribute("type", 16)));
+            foreach (var palmTemplate in palmTemplates)
+            {
+                XElement record = new XElement("RECORD",
+                         new XAttribute("operation", 1),
+                                new XAttribute("templ_data", palmTemplate.Template),
+                                new XAttribute("quality", palmTemplate.Quality),
+                                new XAttribute("id", palmTemplate.UserId),
+                                new XAttribute("templ_format", 2),
+                                new XAttribute("finger_no", palmTemplate.HandType),
+                                new XAttribute("check_type", "full"));
+                krecept.Element("REQUEST")
+                        .Add(record);
+            }
+            
+                //конец запроса
+            var arr = ConvertXmlToByteArray(krecept, new UTF8Encoding());
+            var str = System.Text.Encoding.UTF8.GetString(arr);
+            return str;
+        }
         public string RequestEmployees()
         {
-            XElement krecept = new XElement("KRECEPT", new XElement("REQUEST", new XAttribute("type", 5), new XElement("RECORD", new XAttribute("operation", 0))));
+            XElement krecept = new XElement("KRECEPT",
+                new XElement("REQUEST",
+                    new XAttribute("type", 5),
+                            new XElement("RECORD",
+                        new XAttribute("operation", 0))));
             var arr = ConvertXmlToByteArray(krecept, new UTF8Encoding());
             var str = Encoding.UTF8.GetString(arr);
             return str;
@@ -80,8 +164,12 @@ namespace BiosmarStudioClient
         {
             XElement krecept =
                 new XElement("KRECEPT",
-                new XElement("REQUEST", new XAttribute("type", 17),
-                new XElement("RECORD", new XAttribute("id", controllerId), new XAttribute("operation", 1), new XAttribute("client_id", "mon1"))));
+                new XElement("REQUEST", 
+                    new XAttribute("type", 17),
+                                new XElement("RECORD",
+                             new XAttribute("id", controllerId),
+                                    new XAttribute("operation", 1), 
+                                    new XAttribute("client_id", "mon1"))));
             var arr = ConvertXmlToByteArray(krecept, new UTF8Encoding());
             var str = Encoding.UTF8.GetString(arr);
             return str;
@@ -91,8 +179,12 @@ namespace BiosmarStudioClient
         {
             XElement krecept =
                 new XElement("KRECEPT",
-                new XElement("REQUEST", new XAttribute("type", 17),
-                new XElement("RECORD", new XAttribute("id", controllerId), new XAttribute("operation", 3), new XAttribute("client_id", "mon1"))));
+                new XElement("REQUEST", 
+                    new XAttribute("type", 17),
+                                new XElement("RECORD", 
+                             new XAttribute("id", controllerId),
+                                    new XAttribute("operation", 3), 
+                                    new XAttribute("client_id", "mon1"))));
             var arr = ConvertXmlToByteArray(krecept, new UTF8Encoding());
             var str = Encoding.UTF8.GetString(arr);
             return str;
@@ -102,7 +194,8 @@ namespace BiosmarStudioClient
         {
             XElement krecept =
                 new XElement("KRECEPT",
-                new XElement("REQUEST", new XAttribute("type", 2)));
+                new XElement("REQUEST",
+                    new XAttribute("type", 2)));
             var arr = ConvertXmlToByteArray(krecept, new UTF8Encoding());
             var str = Encoding.UTF8.GetString(arr);
             return str;
@@ -112,8 +205,11 @@ namespace BiosmarStudioClient
         {
             XElement krecept =
                 new XElement("KRECEPT",
-                new XElement("REQUEST", new XAttribute("type", 17),
-                new XElement("RECORD", new XAttribute("operation", 0), new XAttribute("client_id", "mon1"))));
+                new XElement("REQUEST", 
+                    new XAttribute("type", 17),
+                                new XElement("RECORD",
+                             new XAttribute("operation", 0), 
+                                    new XAttribute("client_id", "mon1"))));
             var arr = ConvertXmlToByteArray(krecept, new UTF8Encoding());
             var str = Encoding.UTF8.GetString(arr);
             return str;
@@ -121,7 +217,11 @@ namespace BiosmarStudioClient
 
         public string RequestEmployeesCards()
         {
-            XElement krecept = new XElement("KRECEPT", new XElement("REQUEST", new XAttribute("type", 9), new XElement("RECORD", new XAttribute("operation", 0))));
+            XElement krecept = new XElement("KRECEPT",
+                            new XElement("REQUEST",
+                                new XAttribute("type", 9), 
+                                            new XElement("RECORD", 
+                                            new XAttribute("operation", 0))));
             var arr = ConvertXmlToByteArray(krecept, new UTF8Encoding());
             var str = Encoding.UTF8.GetString(arr);
             return str;
@@ -129,13 +229,19 @@ namespace BiosmarStudioClient
 
         public string RequestAddEmployeeCard()
         {
-            XElement krecept = new XElement("KRECEPT", new XElement("REQUEST", new XAttribute("type", 9), new XElement("RECORD", new XAttribute("operation", 1), new XAttribute("ca_ow_id", "bs67200118"), new XAttribute("ca_value", "1167200117"))));
+            XElement krecept = new XElement("KRECEPT",
+                            new XElement("REQUEST",
+                                new XAttribute("type", 9), 
+                                            new XElement("RECORD", 
+                                         new XAttribute("operation", 1), 
+                                                new XAttribute("ca_ow_id", "bs67200118"),
+                                                new XAttribute("ca_value", "1167200117"))));
             var arr = ConvertXmlToByteArray(krecept, new UTF8Encoding());
             var str = Encoding.UTF8.GetString(arr);
             return str;
         }
 
-        public string CreateAddEmployeeRequest(string firstName, string lastName, string middleName)
+        public string RequestAddEmployee(string orgId,string firstName, string lastName=null, string middleName=null)
         {
             XElement krecept = new XElement("KRECEPT",
                 new XElement("REQUEST",
@@ -149,13 +255,32 @@ namespace BiosmarStudioClient
                 //конец запроса
                 //запрос на добавление сотрудника
                 new XAttribute("type", 5),
-                new XElement("RECORD",/* new XAttribute("id", bsid),*/ new XAttribute("operation", 1),
-                new XElement("FIELD", new XAttribute("name", "last_name"), lastName),
-                new XElement("FIELD", new XAttribute("name", "org_id"),/* new XAttribute("dbid", "bs67200101"),*/ "bs67200099"),
-                new XElement("FIELD", new XAttribute("name", "first_name"), firstName),
-                new XElement("FIELD", new XAttribute("name", "middle_name"), middleName)
+                             new XElement("RECORD",
+                              new XAttribute("operation", 1),
+                                        new XElement("FIELD",
+                                        new XAttribute("name", "last_name"), lastName),
+                                        new XElement("FIELD", 
+                                        new XAttribute("name", "org_id"),/* new XAttribute("dbid", "bs67200101"),*/ orgId),
+                                        new XElement("FIELD", 
+                                        new XAttribute("name", "first_name"), firstName),
+                                        new XElement("FIELD",
+                                        new XAttribute("name", "middle_name"), middleName)
                 //конец запроса
                 )));
+            var arr = ConvertXmlToByteArray(krecept, new UTF8Encoding());
+            var str = System.Text.Encoding.UTF8.GetString(arr);
+            return str;
+        }
+
+        public string RequestGetOrganizations()
+        {
+            XElement krecept = new XElement("KRECEPT",
+                new XElement("REQUEST",
+                // запрос об организациях
+                        new XAttribute("type", 6),
+                                    new XElement("RECORD",
+                                    new XAttribute("operation", 0))));
+                //конец запроса
             var arr = ConvertXmlToByteArray(krecept, new UTF8Encoding());
             var str = System.Text.Encoding.UTF8.GetString(arr);
             return str;
