@@ -10,11 +10,10 @@ using System.Xml;
 using System.Xml.Linq;
 using System.Xml.Schema;
 using System.Xml.XPath;
-using BiosmartStudioClient;
 
 namespace BiosmarStudioClient
 {
-    class BiosmartClient
+    class BiosmartClient //socket version
     {
         private TcpClient client;
         private NetworkStream stream;

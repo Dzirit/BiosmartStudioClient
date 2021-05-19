@@ -1,49 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reactive.Linq;
-using BiosmartStudioClient;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 
 namespace BiosmarStudioClient
 {
     class Program
     {
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
-            var bs = new BiosmartClient("127.0.0.1", 60003);
-                bs.SendRequest(bs.RequestGetOrganizations());
-                var answer = bs.ReadAnswer();
-                var orgId = bs.ParseOrganizations(answer);
-                bs.SendRequest(bs.RequestAddEmployee(orgId[0], "asd", DateTime.Now.ToShortTimeString()));
-                answer = bs.ReadAnswer();
-                var userId = bs.ParseUserId(answer);
-                var t = new PalmTemplate()
-                {
-                    HandType = 101,
-                    Template = "fdsfds",
-                    Quality = 100,
-                    UserId = userId
-                };
-                var t2 = new PalmTemplate()
-                {
-                    HandType = 101,
-                    Template = "fdsfffffffds",
-                    Quality = 100,
-                    UserId = userId
-                };
-                var lt = new List<PalmTemplate>();
-                lt.Add(t);
-                lt.Add(t2);
-                bs.SendRequest(bs.RequestAddTemplates(lt));
-                answer = bs.ReadAnswer();
+            var config = new ConfigurationBuilder()
+                                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                                 .Build();
+            var bs = new BiosmartManager(config);
+            var templates = await bs.GetTemplates();
             
-            //var timer = Observable.Interval(TimeSpan.FromMilliseconds(1000));
-            //var timerDisposable = timer.Subscribe(x =>
-            //{
-            //    bs.SendRequest(bs.RequestMonitoringEvents());
-            //    bs.ReadAnswer();
-            //});
             Console.ReadLine();
-            bs.CloseConnection();
         }
     }
 }
